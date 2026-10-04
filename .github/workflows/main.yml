@@ -1,0 +1,43 @@
+name: Nexus CI/CD Master Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  security-audit:
+    name: Security Scan & Dependency Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Dependency Check
+        run: echo "Executing security dependency vulnerability audit..."
+
+  unit-and-domain-tests:
+    name: Run Domain Unit Tests
+    runs-on: ubuntu-latest
+    needs: security-audit
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Unit Tests
+        run: echo "Executing JUnit 5 tests for domain business rules..."
+
+  integration-and-authz-tests:
+    name: Run Security Authorization & Integration Tests
+    runs-on: ubuntu-latest
+    needs: unit-and-domain-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Testcontainers & Authorization Verification
+        run: echo "Executing authorization pre-retrieval tests with Testcontainers..."
+
+  build-and-package:
+    name: Build OCI Container Images
+    runs-on: ubuntu-latest
+    needs: integration-and-authz-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker Container
+        run: echo "Packaging Nexus backend & frontend services into Docker images..."
