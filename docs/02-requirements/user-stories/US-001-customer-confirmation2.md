@@ -85,3 +85,4 @@ jira:
 - tạo ticket ==> móc nối
 - phình to ==> cần cái gì đó confirm, tức là cần một yêu cầu chính thức
 -----
+
