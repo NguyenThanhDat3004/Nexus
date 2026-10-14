@@ -1,0 +1,107 @@
+name: Notify Collaborators on Commit
+
+on:
+  push:
+    branches:
+      - '**'
+jobs:
+  send-commit-email:
+    name: Send Email Notification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract Commit Info and Collaborator Emails
+        id: vars
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+
+          # Trích xuất toàn bộ email từ lịch sử git log, lọc bỏ github noreply và dòng trống
+          GIT_EMAILS=$(git log --format='%ae' | sort -u | grep -E -v '(users\.noreply\.github\.com|^$)' | tr '\n' ',' | sed 's/,$//')
+          
+          # Ưu tiên secret nếu có, ngược lại dùng danh sách tự động từ git log
+          TARGET_EMAILS="${{ secrets.COLLABORATOR_EMAILS }}"
+          if [ -z "$TARGET_EMAILS" ]; then
+            TARGET_EMAILS="$GIT_EMAILS"
+          fi
+
+          echo "recipient_emails=$TARGET_EMAILS" >> $GITHUB_OUTPUT
+          echo "Recipients: $TARGET_EMAILS"
+
+      - name: Send Email Notification to Collaborators
+        if: ${{ secrets.MAIL_USERNAME != '' && secrets.MAIL_PASSWORD != '' && steps.vars.outputs.recipient_emails != '' }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER || 'smtp.gmail.com' }}
+          server_port: ${{ secrets.MAIL_PORT || 465 }}
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "New commit ${{ steps.vars.outputs.short_sha }} by ${{ github.actor }} at ${{ github.ref_name }}"
+          to: ${{ steps.vars.outputs.recipient_emails }}
+          from: "Nexus No-Reply <${{ secrets.MAIL_USERNAME }}>"
+          html_body: |
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #24292e; background-color: #f6f8fa; margin: 0; padding: 20px; }
+                .card { max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e1e4e8; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+                .header { background: #0f172a; color: #ffffff; padding: 20px 24px; }
+                .header h2 { margin: 0; font-size: 18px; font-weight: 600; }
+                .body { padding: 24px; }
+                .info-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                .info-table td { padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+                .label { font-weight: 600; color: #64748b; width: 130px; }
+                .badge { display: inline-block; padding: 2px 8px; font-size: 12px; font-weight: 600; background: #e0f2fe; color: #0369a1; border-radius: 4px; }
+                .commit-msg { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 4px; font-family: Consolas, Monaco, monospace; font-size: 13px; color: #1e293b; white-space: pre-wrap; margin: 16px 0; }
+                .btn { display: inline-block; background-color: #2563eb; color: #ffffff !important; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-weight: 500; font-size: 14px; }
+                .footer { padding: 16px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
+              </style>
+            </head>
+            <body>
+              <div class="card">
+                <div class="header">
+                  <h2>🚀 Nexus No-Reply - Thông Báo Commit Mới</h2>
+                </div>
+                <div class="body">
+                  <p style="margin-top: 0;">Xin chào các thành viên dự án,</p>
+                  <p>Vừa có một commit mới được đẩy lên kho lưu trữ <strong>${{ github.repository }}</strong>.</p>
+                  
+                  <table class="info-table">
+                    <tr>
+                      <td class="label">Người commit:</td>
+                      <td><strong>${{ github.event.head_commit.author.name || github.actor }}</strong> (@${{ github.actor }})</td>
+                    </tr>
+                    <tr>
+                      <td class="label">Nhánh (Branch):</td>
+                      <td><span class="badge">${{ github.ref_name }}</span></td>
+                    </tr>
+                    <tr>
+                      <td class="label">Mã Commit:</td>
+                      <td><code>${{ steps.vars.outputs.short_sha }}</code> (<em>${{ github.sha }}</em>)</td>
+                    </tr>
+                    <tr>
+                      <td class="label">Thời gian:</td>
+                      <td>${{ github.event.head_commit.timestamp }}</td>
+                    </tr>
+                  </table>
+
+                  <p style="margin-bottom: 6px; font-weight: 600;">Nội dung commit:</p>
+                  <div class="commit-msg">${{ github.event.head_commit.message }}</div>
+
+                  <div style="text-align: center; margin-top: 24px;">
+                    <a href="${{ github.event.head_commit.url || github.event.compare }}" class="btn">Xem chi tiết trên GitHub</a>
+                  </div>
+                </div>
+                <div class="footer">
+                  Nexus No-Reply &bull; Gửi tự động qua GitHub Actions
+                </div>
+              </div>
+            </body>
+            </html>
