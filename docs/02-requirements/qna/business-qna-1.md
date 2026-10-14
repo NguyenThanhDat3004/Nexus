@@ -70,3 +70,6 @@ jira với mình
 -aaaa-
 tin nhắn ==> hợp đồng khá hợp 
 cần người 
+7.break-glass access thuộc nhóm rủi ro Elevation of Privilege và cần biện pháp là "mandatory break-glass approval" nôm na là bắt buộc phê duyệt thì vậy ai là người phê duyệt, khi xảy ra sự cố thì việc vận hành rủi ro như thế nào, trong bao lâu, ai là người chịu trách nhiệm ? 
+8. khi mà kí confirrm thì nếu ko phải customer chính chủ kí mà là một ai đó khác thì làm sao xác  nhận dc đó là chính chủ và ko phải chịu rủi ro xác thực nào
+
