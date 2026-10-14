@@ -16,6 +16,8 @@ jobs:
 
       - name: Extract Commit Info and Collaborator Emails
         id: vars
+        env:
+          OVERRIDE_EMAILS: ${{ secrets.COLLABORATOR_EMAILS }}
         run: |
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
@@ -24,7 +26,7 @@ jobs:
           GIT_EMAILS=$(git log --format='%ae' | sort -u | grep -E -v '(users\.noreply\.github\.com|^$)' | tr '\n' ',' | sed 's/,$//')
           
           # Ưu tiên secret nếu có, ngược lại dùng danh sách tự động từ git log
-          TARGET_EMAILS="${{ secrets.COLLABORATOR_EMAILS }}"
+          TARGET_EMAILS="$OVERRIDE_EMAILS"
           if [ -z "$TARGET_EMAILS" ]; then
             TARGET_EMAILS="$GIT_EMAILS"
           fi
@@ -33,7 +35,7 @@ jobs:
           echo "Recipients: $TARGET_EMAILS"
 
       - name: Send Email Notification to Collaborators
-        if: ${{ secrets.MAIL_USERNAME != '' && secrets.MAIL_PASSWORD != '' && steps.vars.outputs.recipient_emails != '' }}
+        if: steps.vars.outputs.recipient_emails != ''
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: ${{ secrets.MAIL_SERVER || 'smtp.gmail.com' }}
