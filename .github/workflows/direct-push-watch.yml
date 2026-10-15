@@ -1,0 +1,37 @@
+name: Direct Push Watch (cảnh báo — tuỳ chọn)
+
+# LƯU Ý TRUNG THỰC VỀ GIỚI HẠN:
+# Workflow này KHÔNG chặn được direct push. GitHub Actions chỉ chạy SAU KHI
+# push đã thành công. Việc CHẶN thật do Ruleset làm (xem README).
+# Job này chỉ là chuông báo động cho trường hợp ruleset bị bypass/tắt:
+# một push lên main/develop mà commit đầu không gắn với PR đã merged nào
+# sẽ làm run này FAIL đỏ để admin nhìn thấy ngay trong tab Actions.
+
+on:
+  push:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  direct-push-watch:
+    name: direct-push-watch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check head commit came from a merged PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          REF_NAME: ${{ github.ref_name }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          PR_COUNT=$(gh api "repos/${{ github.repository }}/commits/$SHA/pulls" \
+            --jq '[.[] | select(.merged_at != null)] | length')
+          if [ "$PR_COUNT" -eq 0 ]; then
+            echo "::error::Push trực tiếp lên $REF_NAME bởi $ACTOR — commit $SHA không thuộc PR đã merged nào."
+            echo "::error::Nếu đây không phải thao tác khẩn cấp đã được duyệt, hãy revert và đi lại qua PR."
+            exit 1
+          fi
+          echo "OK: commit $SHA thuộc $PR_COUNT PR đã merged."

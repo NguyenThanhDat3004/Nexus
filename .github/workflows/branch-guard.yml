@@ -1,0 +1,56 @@
+name: Branch Guard
+
+# Dùng pull_request_target (KHÔNG phải pull_request):
+# workflow + script được lấy từ BASE branch (nhánh đã được bảo vệ, đáng tin),
+# không lấy từ PR branch. Nếu lấy từ PR branch, tác giả PR chỉ cần sửa
+# scripts/branch-guard.sh thành "luôn pass" là qua mặt được CI.
+# Job này chỉ ĐỌC lịch sử git của PR để kiểm tra ancestor/merge-commit,
+# tuyệt đối không checkout và không chạy code của PR.
+on:
+  pull_request_target:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: branch-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  branch-guard:
+    # Tên job này chính là "required status check" phải khai trong ruleset.
+    # Đổi tên ở đây thì phải đổi cả trong github-ruleset-protect-main-develop.json
+    name: branch-guard
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout ở BASE branch (mặc định của pull_request_target) để lấy
+      # bản scripts/branch-guard.sh đáng tin.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch PR head and latest base
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.base_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          git fetch origin "$BASE_REF"
+          # Fetch qua ref refs/pull/<n>/head — đường GitHub đảm bảo tồn tại
+          # cho mọi PR (kể cả từ fork). Fetch thẳng bằng raw SHA có thể bị
+          # server từ chối ("couldn't find remote ref") tuỳ cấu hình
+          # uploadpack, làm check đỏ vì lý do hạ tầng chứ không phải vì
+          # PR chưa rebase.
+          git fetch origin "refs/pull/$PR_NUMBER/head"
+          # Kiểm chứng object vừa fetch đúng là head SHA mà event báo,
+          # tránh kiểm tra nhầm một head cũ/khác.
+          test "$(git rev-parse FETCH_HEAD)" = "$HEAD_SHA"
+
+      - name: Check rebased on latest base, no merge commits
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.base_ref }}
+        run: bash scripts/branch-guard.sh "origin/$BASE_REF" "$HEAD_SHA"
