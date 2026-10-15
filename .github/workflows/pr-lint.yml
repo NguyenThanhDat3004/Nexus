@@ -1,0 +1,25 @@
+name: PR Verification
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  check-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Lấy toàn bộ history để kiểm tra commit
+
+      - name: Check for merge commits (Nếu team quy ước không merge commits nhánh con)
+        run: |
+          # Kiểm tra xem các commit trong PR có chứa merge commit hay không
+          MERGE_COMMITS=$(git log --merges origin/${{ github.base_ref }}..HEAD --oneline)
+          if [ -n "$MERGE_COMMITS" ]; then
+            echo "::error::PR này chứa Merge commit không hợp lệ! Vui lòng rebase hoặc dùng squash merge."
+            echo "$MERGE_COMMITS"
+            exit 1
+          fi
+          echo "Lịch sử commit hợp lệ!"
