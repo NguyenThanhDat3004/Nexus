@@ -1,0 +1,108 @@
+name: Notify Assignee on Issue Assigned
+
+on:
+  issues:
+    types: [assigned]
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  send-issue-email:
+    name: Send Email to Assignee
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve Assignee Email
+        id: resolver
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSIGNEE: ${{ github.event.assignee.login }}
+          USER_EMAIL_MAPPING: ${{ secrets.USER_EMAIL_MAPPING }}
+        run: |
+          echo "Bắt đầu tìm email cho user: $ASSIGNEE"
+          TARGET_EMAIL=""
+
+          # 1. Trích xuất email thực từ lịch sử commit của $ASSIGNEE trong repo (lọc bỏ noreply)
+          echo "Đang quét lịch sử commit của $ASSIGNEE..."
+          COMMITS_JSON=$(gh api "repos/${{ github.repository }}/commits?author=$ASSIGNEE&per_page=30" 2>/dev/null || echo "[]")
+          TARGET_EMAIL=$(echo "$COMMITS_JSON" | jq -r '[.[].commit.author.email, .[].commit.committer.email] | map(select(. != null and (test("users\\.noreply\\.github\\.com|noreply") | not))) | first // empty')
+
+          # 2. Nếu chưa thấy trong commit (user chưa từng commit), thử kiểm tra email công khai trên profile
+          if [ -z "$TARGET_EMAIL" ]; then
+            echo "Chưa thấy commit hợp lệ, kiểm tra email công khai từ GitHub profile..."
+            TARGET_EMAIL=$(gh api "users/$ASSIGNEE" --jq '.email // empty' 2>/dev/null || true)
+            if [[ "$TARGET_EMAIL" =~ users\.noreply\.github\.com ]]; then
+              TARGET_EMAIL=""
+            fi
+          fi
+
+          # 3. Dự phòng bảo mật qua GitHub Secret (nếu quản trị viên có cấu hình thêm)
+          if [ -z "$TARGET_EMAIL" ] && [ -n "$USER_EMAIL_MAPPING" ]; then
+            TARGET_EMAIL=$(echo "$USER_EMAIL_MAPPING" | jq -r --arg u "$ASSIGNEE" '.[$u] // empty')
+          fi
+
+          if [ -z "$TARGET_EMAIL" ]; then
+            echo "::warning::Không tìm thấy email của user $ASSIGNEE (chưa có commit thực tế hoặc đang ẩn email)."
+            echo "recipient_email=" >> $GITHUB_OUTPUT
+          else
+            echo "Đã tìm thấy email đích: $TARGET_EMAIL"
+            echo "recipient_email=$TARGET_EMAIL" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Email Notification
+        if: steps.resolver.outputs.recipient_email != ''
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER || 'smtp.gmail.com' }}
+          server_port: ${{ secrets.MAIL_PORT || 465 }}
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "Task mới tại Github: #${{ github.event.issue.number }} - ${{ github.event.issue.title }}"
+          to: ${{ steps.resolver.outputs.recipient_email }}
+          from: "Nexus No-Reply <${{ secrets.MAIL_USERNAME }}>"
+          html_body: |
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #24292e; background-color: #f6f8fa; margin: 0; padding: 20px; }
+                .card { max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e1e4e8; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+                .header { background: #0f172a; color: #ffffff; padding: 20px 24px; }
+                .header h2 { margin: 0; font-size: 18px; font-weight: 600; }
+                .body { padding: 24px; }
+                .greeting { font-size: 15px; margin-bottom: 16px; }
+                .highlight-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-left: 4px solid #22c55e; padding: 14px 16px; border-radius: 4px; margin: 16px 0; }
+                .issue-title { font-weight: 600; color: #15803d; font-size: 16px; margin-bottom: 6px; }
+                .issue-number { font-weight: 700; color: #047857; }
+                .btn { display: inline-block; background-color: #2563eb; color: #ffffff !important; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-weight: 500; font-size: 14px; margin-top: 12px; }
+                .footer { padding: 16px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
+              </style>
+            </head>
+            <body>
+              <div class="card">
+                <div class="header">
+                  <h2>📌 Nexus Task Management - Thông Báo Phân Công</h2>
+                </div>
+                <div class="body">
+                  <p class="greeting">Thân chào <strong>@${{ github.event.assignee.login }}</strong>,</p>
+                  <p>Bạn vừa được assign task mới tại GitHub số <span class="issue-number">#${{ github.event.issue.number }}</span> với tiêu đề: <strong>${{ github.event.issue.title }}</strong>.</p>
+                  
+                  <div class="highlight-box">
+                    <div class="issue-title">#${{ github.event.issue.number }}: ${{ github.event.issue.title }}</div>
+                    <div style="font-size: 13px; color: #475569;">Người phân công: @${{ github.event.sender.login }}</div>
+                  </div>
+
+                  <p>Vui lòng truy cập tại đây để check chi tiết:</p>
+                  <div style="text-align: center; margin: 20px 0;">
+                    <a href="${{ github.event.issue.html_url }}" class="btn">Truy cập tại đây để check chi tiết</a>
+                  </div>
+                </div>
+                <div class="footer">
+                  Nexus Task Notifications &bull; Gửi tự động qua GitHub Actions
+                </div>
+              </div>
+            </body>
+            </html>
