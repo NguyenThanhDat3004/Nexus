@@ -17,7 +17,11 @@
 - **FR-08 (Delivery Portal View):** Delivery teams can access team-private channels, technical context, and integration references.
 - **FR-09 (Admin Portal Governance):** Admins can manage organization tenants, OAuth integrations, and break-glass audit logs.
 
-### 1.4. Initial User Story (Sprint 1 Handoff)
+### 1.4. UI/UX & Interaction Specifications
+- **[UI Flows & Screen Architecture](file:///e:/Nexus/Nexus/docs/02-requirements/ui-flows.md)**: Core User Flows (Auth, Company Dashboard, Dedicated Project Space 2/10-6/10-2/10, Workspace Federation & 403 PIN Gate).
+- **[Roles & Permissions Specification](file:///e:/Nexus/Nexus/docs/02-requirements/roles-and-permissions.md)**: 3-Tier Multi-Tenant Role Hierarchy, Contextual Role Matrix & Dev Seeding Pool.
+
+### 1.5. Initial User Story (Sprint 1 Handoff)
 - **[US-001: Initial Requirement Proposal & Customer Confirmation Flow](file:///e:/Nexus/Nexus/docs/02-requirements/user-stories/US-001-customer-confirmation.md)**
   - Captures initial BA proposal, 1-click Customer Confirmation, Content Locking, Cross-Team Notification Bridge, and Jira Ticket Linking.
 
