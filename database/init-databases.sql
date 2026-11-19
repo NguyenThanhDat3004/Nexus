@@ -5,7 +5,7 @@
 -- ========================================================
 
 -- 1. Database cho Identity & Access Context (Spring Boot - Đạt)
-CREATE DATABASE identity;
+CREATE DATABASE identify_access;
 
 -- 2. Database cho Workspace & Project Context (Spring Boot - Huy)
 CREATE DATABASE workspace;
