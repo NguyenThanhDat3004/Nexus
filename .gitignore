@@ -16,6 +16,17 @@ build/
 *.class
 *.jar
 *.war
+*.zip
+*.tar.gz
+HELP.md
+hs_err_pid*
+replay_pid*
+
+# Local configuration files
+*-local.properties
+*-local.yml
+*-local.yaml
+application-local.*
 
 # ==========================================
 # Node.js / NestJS / React
