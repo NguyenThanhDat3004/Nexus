@@ -8,8 +8,21 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class IdentifyAccessApplication {
 
 	public static void main(String[] args) {
-		Dotenv dotenv = Dotenv.configure().ignoreIfMissing().load();
-		dotenv.entries().forEach(entry -> System.setProperty(entry.getKey(), entry.getValue()));
+		// Tự động tìm file .env duy nhất từ thư mục hiện tại lùi dần lên thư mục gốc
+		java.io.File dir = new java.io.File(".").getAbsoluteFile();
+		while (dir != null) {
+			java.io.File envFile = new java.io.File(dir, ".env");
+			if (envFile.exists() && envFile.isFile()) {
+				Dotenv dotenv = Dotenv.configure().directory(dir.getAbsolutePath()).load();
+				dotenv.entries().forEach(entry -> {
+					if (System.getProperty(entry.getKey()) == null) {
+						System.setProperty(entry.getKey(), entry.getValue());
+					}
+				});
+				break;
+			}
+			dir = dir.getParentFile();
+		}
 
 		SpringApplication.run(IdentifyAccessApplication.class, args);
 	}
