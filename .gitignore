@@ -54,3 +54,12 @@ Thumbs.db
 *.log
 logs/
 *.tmp
+
+# ==========================================
+# Playwright Browser Binaries & Test Artifacts
+# ==========================================
+Skill/PlaywrightBrowsers/
+**/PlaywrightBrowsers/
+test-results/
+playwright-report/
+
