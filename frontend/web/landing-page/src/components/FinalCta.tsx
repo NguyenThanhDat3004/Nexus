@@ -1,28 +1,47 @@
-import { ArrowRight, CircleCheck, LoaderCircle } from 'lucide-react'
+import { ArrowRight, CircleAlert, CircleCheck, LoaderCircle } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { Reveal } from './Reveal'
+import { demoRequestClient } from '../lib/demoRequestClient'
+import { Reveal } from '@nexus/ui'
 
 type Status = 'idle' | 'submitting' | 'success'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+const FAILURE_MESSAGES = {
+  rate_limited: 'Too many requests from this network. Please try again in a few minutes.',
+  network: 'We could not reach Nexus. Check your connection and try again.',
+  server: 'Something went wrong on our side. Please try again.',
+} as const
+
 export function FinalCta() {
   const [email, setEmail] = useState('')
   const [company, setCompany] = useState('')
   const [errors, setErrors] = useState<{ email?: string; company?: string }>({})
+  const [formError, setFormError] = useState<string | null>(null)
   const [status, setStatus] = useState<Status>('idle')
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
     const next: typeof errors = {}
     if (!EMAIL_RE.test(email.trim())) next.email = 'Enter a valid work email.'
     if (!company.trim()) next.company = 'Tell us which company you are with.'
     setErrors(next)
+    setFormError(null)
     if (Object.keys(next).length) return
 
-    // TODO: wire to the demo-request endpoint once the API gateway exposes one.
     setStatus('submitting')
-    window.setTimeout(() => setStatus('success'), 900)
+    const result = await demoRequestClient.submit({ email: email.trim(), company: company.trim() })
+    if (result.ok) {
+      setStatus('success')
+      return
+    }
+    setStatus('idle')
+    if (result.reason === 'validation') {
+      setErrors(result.fieldErrors)
+      if (!Object.keys(result.fieldErrors).length) setFormError('Please check the details and try again.')
+    } else {
+      setFormError(FAILURE_MESSAGES[result.reason])
+    }
   }
 
   return (
@@ -69,6 +88,12 @@ export function FinalCta() {
                   onChange={setCompany}
                   error={errors.company}
                 />
+                {formError && (
+                  <p role="alert" className="flex items-start gap-2 rounded-xl border border-brand-pink/30 bg-brand-pink/10 px-4 py-3 text-sm text-ink">
+                    <CircleAlert size={16} strokeWidth={1.75} className="mt-0.5 shrink-0 text-brand-pink" />
+                    {formError}
+                  </p>
+                )}
                 <button
                   type="submit"
                   disabled={status === 'submitting'}

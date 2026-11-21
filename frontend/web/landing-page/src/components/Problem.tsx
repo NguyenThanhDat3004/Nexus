@@ -1,7 +1,7 @@
 import { Mail, MessageSquare, Phone } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { ToolLogo } from './Brand'
-import { Reveal } from './Reveal'
+import { Reveal } from '@nexus/ui'
 
 const FRAGMENTS: { icon: ReactNode; source: string; text: string; tilt: string }[] = [
   { icon: <Mail size={14} strokeWidth={1.75} />, source: 'Email, 14 replies', text: 'Re: Re: Fwd: checkout timeout?', tilt: 'md:-rotate-2 md:translate-y-3' },

@@ -1,6 +1,7 @@
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/jetbrains-mono";
 @import "tailwindcss";
+@source "../../../shared/ui/src";
 
 /*
  * Nexus marketing site: dark-only visual identity (Linear / Stripe / Vercel family).
@@ -156,7 +157,10 @@ html {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* Gradient scroll progress at the very top. Driven by the scroll timeline, no JS. */
+/*
+ * Gradient scroll progress at the very top. Driven by the scroll timeline where supported;
+ * <ScrollProgress> writes the transform itself in browsers without animation-timeline.
+ */
 .scroll-progress {
   position: fixed;
   inset: 0 0 auto 0;
@@ -167,12 +171,6 @@ html {
   background: linear-gradient(90deg, #7c6cff, #22d3ee, #f472b6);
   box-shadow: 0 0 12px rgb(124 108 255 / 0.8);
   pointer-events: none;
-}
-
-@supports not (animation-timeline: scroll()) {
-  .scroll-progress {
-    display: none;
-  }
 }
 
 /* Horizon: thin bright line with a soft glow that opens a section. */
@@ -296,20 +294,6 @@ html {
 @media (prefers-reduced-motion: no-preference) {
   html {
     scroll-behavior: smooth;
-  }
-
-  .reveal {
-    opacity: 0;
-    transform: translateY(18px);
-    transition:
-      opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-      transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-    transition-delay: var(--delay, 0ms);
-  }
-
-  .reveal[data-shown="true"] {
-    opacity: 1;
-    transform: none;
   }
 
   /* Hero thread plays back in order: message, tag, confirmation, links. */

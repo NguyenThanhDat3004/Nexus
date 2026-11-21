@@ -1,6 +1,6 @@
 import { Database, Fingerprint, ShieldCheck, UserRound } from 'lucide-react'
 import { Horizon, Spotlight } from './Backdrop'
-import { Reveal } from './Reveal'
+import { Reveal } from '@nexus/ui'
 
 const PIPELINE = [
   { icon: UserRound, title: 'Request', detail: 'Web, mobile or API' },

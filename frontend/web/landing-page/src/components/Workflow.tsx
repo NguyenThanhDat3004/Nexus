@@ -1,5 +1,5 @@
 import { BadgeCheck, GitMerge, Link2, MessagesSquare } from 'lucide-react'
-import { Reveal } from './Reveal'
+import { Reveal } from '@nexus/ui'
 
 const STEPS = [
   {

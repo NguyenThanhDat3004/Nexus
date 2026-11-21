@@ -1,7 +1,7 @@
 import { ArrowRight, EyeOff, Lock, Search } from 'lucide-react'
 import { ToolLogo } from './Brand'
 import { Horizon, Spotlight } from './Backdrop'
-import { Reveal } from './Reveal'
+import { Reveal } from '@nexus/ui'
 
 export function Capabilities() {
   return (

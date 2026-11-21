@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
-import { Reveal } from './Reveal'
+import { Reveal } from '@nexus/ui'
 
 /** Personas come from docs/01-business/personas.md. */
 const ROLES = [

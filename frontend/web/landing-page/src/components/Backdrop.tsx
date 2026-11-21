@@ -1,4 +1,4 @@
-import { useRef, type ElementType, type PointerEvent, type ReactNode } from 'react'
+import { useEffect, useRef, type ElementType, type PointerEvent, type ReactNode } from 'react'
 import { ParticleField } from './ParticleField'
 
 /**
@@ -25,9 +25,39 @@ export function HeroBackdrop() {
   )
 }
 
-/** Gradient reading-progress bar along the top edge. */
+/**
+ * Gradient reading-progress bar along the top edge.
+ * CSS scroll timeline drives it where supported. Elsewhere a passive, rAF-batched listener
+ * writes the transform directly, so React never re-renders while scrolling.
+ */
 export function ScrollProgress() {
-  return <div aria-hidden="true" className="scroll-progress" />
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const bar = ref.current
+    if (!bar || CSS.supports('animation-timeline: scroll()')) return
+
+    let frame = 0
+    const update = () => {
+      frame = 0
+      const max = document.documentElement.scrollHeight - window.innerHeight
+      bar.style.transform = `scaleX(${max > 0 ? Math.min(1, window.scrollY / max) : 0})`
+    }
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update)
+    }
+
+    update()
+    window.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('resize', schedule)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', schedule)
+      window.removeEventListener('resize', schedule)
+    }
+  }, [])
+
+  return <div ref={ref} aria-hidden="true" className="scroll-progress" />
 }
 
 /** Thin bright line with a soft glow that opens a section. Parent must be `relative`. */
