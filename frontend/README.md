@@ -3,6 +3,7 @@
 Nexus Frontend is structured as a **Monorepo** to maximize reusability across Web Portals and Mobile Clients:
 
 ## 1. Web Applications (`web/`)
+- `web/landing-page/`: Public marketing site shared by all portals (product story, demo request, sign-in entry to Customer & Delivery portals)
 - `web/customer-portal/`: Web Portal for Clients & Product Sponsors (Requirements & Confirmations Dashboard)
 - `web/delivery-portal/`: Web Portal for BAs, Developers, QA, DevOps (Full Messaging & Integration Tools)
 - `web/admin-portal/`: System Administration Portal (Tenant Config, Security Audits, Integration Settings)
