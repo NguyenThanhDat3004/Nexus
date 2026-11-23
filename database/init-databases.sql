@@ -13,4 +13,8 @@ CREATE DATABASE workspace;
 -- 3. Database cho Collaboration & Messaging Context (NestJS - Phúc)
 CREATE DATABASE collaboration;
 
+-- 4. Database cho Notification Context (NestJS - Phúc)
+-- Bảng do Prisma Migrate tạo: cd backend/domains/notification && npx prisma migrate deploy
+CREATE DATABASE notification;
+
 -- các flyway sẽ chạy riêng trong từng service, vui lòng khai báo cho đúng
