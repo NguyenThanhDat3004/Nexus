@@ -1,0 +1,17 @@
+# dependencies
+/node_modules
+
+# build output
+/dist
+
+# env — KHÔNG bao giờ commit secret
+.env
+.env.local
+.env.*.local
+
+# logs
+*.log
+
+# editor
+.vscode/
+.idea/
