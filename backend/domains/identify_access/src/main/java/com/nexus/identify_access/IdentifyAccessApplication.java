@@ -8,7 +8,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class IdentifyAccessApplication {
 
 	public static void main(String[] args) {
-		// Tự động tìm file .env duy nhất từ thư mục hiện tại lùi dần lên thư mục gốc
+		// Automatically locate root .env file by traversing up parent directories
 		java.io.File dir = new java.io.File(".").getAbsoluteFile();
 		while (dir != null) {
 			java.io.File envFile = new java.io.File(dir, ".env");

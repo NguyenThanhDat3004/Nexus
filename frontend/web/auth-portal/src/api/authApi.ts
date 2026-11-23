@@ -1,7 +1,19 @@
 import { AUTH_ENDPOINTS } from './authEndpoints'
 import { ApiResponse, AuthTokens, SsoExchangePayload, UserProfile } from '../types'
 
-const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL ?? 'http://localhost:8000'
+const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL ?? 'http://localhost:8081'
+
+export interface SsoBackendResponse {
+  success: boolean
+  accessToken: string
+  refreshToken: string
+  expiresIn: number
+  user: {
+    id: string
+    email: string
+    fullName: string
+  }
+}
 
 export const authApi = {
   async getAuthorizeUrl(provider: 'GOOGLE' | 'MICROSOFT'): Promise<string> {
@@ -14,15 +26,14 @@ export const authApi = {
     return body.data.authorizationUrl
   },
 
-  async exchangeSsoCode(payload: SsoExchangePayload): Promise<{ tokens: AuthTokens; user: UserProfile }> {
+  async exchangeSsoCode(payload: SsoExchangePayload): Promise<SsoBackendResponse> {
     const res = await fetch(`${GATEWAY_URL}${AUTH_ENDPOINTS.SSO_EXCHANGE}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
     if (!res.ok) throw new Error(`Xác thực mã SSO thất bại (${res.status})`)
-    const body: ApiResponse<{ tokens: AuthTokens; user: UserProfile }> = await res.json()
-    return body.data
+    return await res.json()
   },
 
   async getCurrentUser(accessToken: string): Promise<UserProfile> {

@@ -11,6 +11,7 @@ export interface LoginViewProps {
   onRequestInvitation?: () => void
   onForgotPassword?: () => void
   isLoading?: boolean
+  error?: string | null
 }
 
 export function LoginView({
@@ -20,6 +21,7 @@ export function LoginView({
   onRequestInvitation,
   onForgotPassword,
   isLoading = false,
+  error = null,
 }: LoginViewProps) {
   return (
     <div className="relative w-full rounded-[36px] bg-white/95 p-8 sm:p-12 shadow-[0_25px_80px_rgba(30,27,75,0.12)] border border-slate-200/80 backdrop-blur-2xl transition-all">
@@ -41,6 +43,18 @@ export function LoginView({
           Enterprise Evidentiary Platform &amp; Decision Ledger
         </p>
       </div>
+
+      {/* Error Banner Thẩm Mỹ (Chỉ hiện khi có lỗi, màu sắc trang nhã, icon cảnh báo) */}
+      {error && (
+        <div className="mt-6 flex items-start gap-3 rounded-2xl bg-rose-50/90 border border-rose-200/80 p-3.5 text-xs text-rose-700 animate-in fade-in slide-in-from-top-1 duration-200">
+          <svg className="size-4 shrink-0 text-rose-500 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span className="leading-relaxed font-medium">{error}</span>
+        </div>
+      )}
 
       {/* Credential Form Component */}
       <div className="mt-8">
