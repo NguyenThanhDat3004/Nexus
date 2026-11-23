@@ -2,6 +2,7 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InMemoryTokenStore, TokenStore } from '../tokens/token-store';
 import { TtlCache } from '../common/cache/ttl-cache';
+import { throwUpstreamError } from '../common/http/upstream-error';
 
 const GITHUB_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize';
 const GITHUB_TOKEN_URL = 'https://github.com/login/oauth/access_token';
@@ -131,7 +132,7 @@ export class GithubService {
     const res = await fetch(`${GITHUB_API_BASE}/user`, {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
     });
-    if (!res.ok) throw new UnauthorizedException(`GitHub API lỗi HTTP ${res.status}`);
+    if (!res.ok) throwUpstreamError(res.status, `GitHub API lỗi HTTP ${res.status}`);
     const user = (await res.json()) as GithubUser;
     this.cache.set(cacheKey, user, 5 * 60 * 1000); // 5 phút
     return user;
@@ -159,7 +160,7 @@ export class GithubService {
           headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
         },
       );
-      if (!res.ok) throw new UnauthorizedException(`GitHub API lỗi HTTP ${res.status}`);
+      if (!res.ok) throwUpstreamError(res.status, `GitHub API lỗi HTTP ${res.status}`);
       const repos = (await res.json()) as GithubRepo[];
       all.push(...repos);
       if (repos.length < 100) break;
@@ -202,7 +203,8 @@ export class GithubService {
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new UnauthorizedException(
+      throwUpstreamError(
+        res.status,
         `Tạo webhook GitHub thất bại (HTTP ${res.status}): ${text.slice(0, 300)}`,
       );
     }

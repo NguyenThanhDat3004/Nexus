@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InMemoryTokenStore, TokenStore } from '../tokens/token-store';
 import { TtlCache } from '../common/cache/ttl-cache';
+import { throwUpstreamError } from '../common/http/upstream-error';
 
 const JIRA_AUTHORIZE_URL = 'https://auth.atlassian.com/authorize';
 const JIRA_TOKEN_URL = 'https://auth.atlassian.com/oauth/token';
@@ -182,7 +183,7 @@ export class JiraService {
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new UnauthorizedException(`Jira API lỗi HTTP ${res.status}: ${text.slice(0, 300)}`);
+      throwUpstreamError(res.status, `Jira API lỗi HTTP ${res.status}: ${text.slice(0, 300)}`);
     }
     return (await res.json()) as T;
   }
