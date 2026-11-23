@@ -8,17 +8,29 @@ public class SsoDto {
             String redirectUri
     ) {}
 
+    public record RegistrationRequest(
+            String email,
+            String fullName,
+            String avatarUrl,
+            String providerId,
+            String role,
+            boolean agreedPolicy
+    ) {}
+
     public record LoginResponse(
             boolean success,
+            boolean isNewUser,
             String accessToken,
             String refreshToken,
-            long expiresIn, // Số giây hiệu lực của vé từ Backend (Single Source of Truth)
+            long expiresIn, // Ticket/Token TTL in seconds
             UserData user
     ) {
         public record UserData(
                 String id,
                 String email,
-                String fullName
+                String fullName,
+                String avatarUrl,
+                String role
         ) {}
     }
 }

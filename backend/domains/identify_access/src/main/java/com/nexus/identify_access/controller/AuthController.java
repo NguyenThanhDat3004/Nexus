@@ -34,4 +34,10 @@ public class AuthController {
         SsoDto.LoginResponse response = ssoService.exchangeGoogleCode(request);
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/register")
+    public ResponseEntity<SsoDto.LoginResponse> handleSsoRegistration(@RequestBody SsoDto.RegistrationRequest request) {
+        SsoDto.LoginResponse response = ssoService.registerSsoUser(request);
+        return ResponseEntity.ok(response);
+    }
 }
