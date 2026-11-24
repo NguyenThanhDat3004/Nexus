@@ -31,7 +31,8 @@
       "src/**/*.ts",
       "!src/main.ts"
     ],
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "setupFiles": ["<rootDir>/src/testing/setup-env.ts"]
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.24",
