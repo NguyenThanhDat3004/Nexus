@@ -1,12 +1,24 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import DashboardChannel from './pages/DashboardChannel'
+import DashboardWorkspace from './pages/DashboardWorkspace'
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/" element={<DashboardWorkspace />} />
+      <Route path="/workspaces/:workspaceId/channels" element={<DashboardChannel />} />
+      <Route
+        path="/workspaces/:workspaceId"
+        element={<WorkspaceRedirect />}
+      />
       <Route path="/login" element={<LoginShell />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
+}
+
+function WorkspaceRedirect() {
+  return <Navigate to="channels" replace />
 }
 
 function LoginShell() {
