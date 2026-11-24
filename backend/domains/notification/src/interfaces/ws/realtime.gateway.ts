@@ -23,18 +23,24 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
 
   afterInit(namespace: Namespace) {
     this.hub.attach(namespace);
+    // Xác thực ở middleware: chạy TRƯỚC khi kết nối được chấp nhận.
+    // Nest không chờ handleConnection (async) xong mới gắn message handler, nên nếu xác thực ở đó
+    // client sai token vẫn kịp gửi channel.subscribe khi userId còn undefined.
+    // Token gửi qua handshake.auth (KHÔNG qua query string để không lộ trong log/URL).
+    namespace.use((socket, next) => {
+      this.verifier
+        .verify(socket.handshake.auth?.token as string | undefined)
+        .then((user) => {
+          socket.data.userId = user.userId;
+          next();
+        })
+        .catch(() => next(new Error('UNAUTHORIZED'))); // client nhận connect_error, không bao giờ "connect"
+    });
   }
 
-  /** Token gửi qua handshake.auth (KHÔNG qua query string để không lộ trong log/URL) */
+  /** Tới được đây nghĩa là middleware đã xác thực xong */
   async handleConnection(client: Socket) {
-    try {
-      const user = await this.verifier.verify(client.handshake.auth?.token as string | undefined);
-      client.data.userId = user.userId;
-      await client.join(`user:${user.userId}`);
-    } catch {
-      client.emit('exception', fail(401, 'UNAUTHORIZED'));
-      client.disconnect(true);
-    }
+    await client.join(`user:${client.data.userId}`);
   }
 
   @SubscribeMessage('channel.subscribe')

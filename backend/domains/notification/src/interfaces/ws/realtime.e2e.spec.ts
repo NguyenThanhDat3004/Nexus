@@ -46,11 +46,16 @@ describe('Realtime: WebSocket + SSE (e2e)', () => {
       recipient_user_ids: ['alice'], title: 'Channel mới', body: 'general', ...extra,
     });
 
-  it('WS không có token → nhận exception 401 rồi bị ngắt', async () => {
-    const socket = connect();
-    const exception = await new Promise<{ code: number }>((resolve) => socket.on('exception', resolve));
-    expect(exception.code).toBe(401);
-    await new Promise<void>((resolve) => (socket.disconnected ? resolve() : socket.once('disconnect', () => resolve())));
+  it.each([
+    ['không có token', undefined],
+    ['token sai', 'not-a-jwt'],
+  ])('WS %s → bị từ chối ngay ở handshake (connect_error), không bao giờ connect', async (_, token) => {
+    const socket = connect(token);
+    const onConnect = jest.fn();
+    socket.on('connect', onConnect);
+    const error = await new Promise<Error>((resolve) => socket.once('connect_error', resolve));
+    expect(error.message).toBe('UNAUTHORIZED');
+    expect(onConnect).not.toHaveBeenCalled();
   });
 
   it('WS: chỉ người nhận được đẩy thông báo', async () => {
