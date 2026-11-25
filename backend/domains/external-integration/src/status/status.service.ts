@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { GithubService } from '../github/github.service';
 import { JiraService } from '../jira/jira.service';
 
@@ -24,7 +24,7 @@ export class StatusService {
   ) {}
 
   async getWorkspaceStatus(workspaceId: string): Promise<WorkspaceIntegrationStatus> {
-    const [githubLinked, jiraLinked] = await Promise.all([
+    let [githubLinked, jiraLinked] = await Promise.all([
       this.github.isLinked(),
       this.jira.isLinked(),
     ]);
@@ -33,7 +33,13 @@ export class StatusService {
     if (githubLinked) {
       try {
         githubLogin = (await this.github.getCurrentUser()).login;
-      } catch {
+      } catch (err) {
+        // Token chết (401) thì báo chưa liên kết — đừng để FE hiện "đã liên kết"
+        // trong khi mọi gọi API đều 401. Lỗi khác (mạng, 429, 5xx) chỉ là tạm
+        // thời: giữ linked=true, login=null.
+        if (err instanceof UnauthorizedException) {
+          githubLinked = false;
+        }
         githubLogin = null;
       }
     }
@@ -45,8 +51,12 @@ export class StatusService {
         const user = await this.jira.getCurrentUser();
         jiraName = user.displayName;
         jiraSite = (await this.jira.requireTokens()).siteUrl;
-      } catch {
+      } catch (err) {
+        if (err instanceof UnauthorizedException) {
+          jiraLinked = false;
+        }
         jiraName = null;
+        jiraSite = null;
       }
     }
 

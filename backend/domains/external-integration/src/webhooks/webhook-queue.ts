@@ -4,6 +4,8 @@ export interface WebhookJob {
   key: string;
   run: () => void | Promise<void>;
   retries?: number;
+  /** Gọi khi job thất bại vĩnh viễn (hết 5 lần retry) — để controller gỡ key dedup. */
+  onPermanentFailure?: () => void;
 }
 
 /**
@@ -31,8 +33,12 @@ export class WebhookQueue implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Đẩy job mới vào hàng đợi và kích hoạt xử lý nếu đang nhàn rỗi. */
-  enqueue(key: string, run: () => void | Promise<void>): void {
-    this.queue.push({ key, run, retries: 0 });
+  enqueue(
+    key: string,
+    run: () => void | Promise<void>,
+    onPermanentFailure?: () => void,
+  ): void {
+    this.queue.push({ key, run, retries: 0, onPermanentFailure });
     void this.processNext();
   }
 
@@ -62,7 +68,9 @@ export class WebhookQueue implements OnModuleInit, OnModuleDestroy {
           this.logger.error(
             `Job ${job.key} thất bại sau 5 lần thử lại: ${err?.message ?? err}. Bỏ qua job.`,
           );
-          // Quá 5 lần -> hủy bỏ job
+          // Quá 5 lần -> hủy bỏ job, và báo cho controller gỡ key dedup để
+          // lần gửi lại sau đó không bị bỏ qua như "trùng".
+          job.onPermanentFailure?.();
           this.queue.shift();
         }
       }

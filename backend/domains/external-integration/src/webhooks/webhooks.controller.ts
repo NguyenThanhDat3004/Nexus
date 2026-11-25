@@ -1,4 +1,4 @@
-import { Controller, Headers, Logger, Post, Req, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Controller, Headers, Logger, Post, Req, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'node:crypto';
@@ -68,13 +68,22 @@ export class WebhooksController {
       return { received: true, duplicate: true, projectedCard: null };
     }
 
-    const payload = JSON.parse(rawBody.toString('utf8')) as any;
+    let payload: any;
+    try {
+      payload = JSON.parse(rawBody.toString('utf8')) as any;
+    } catch {
+      throw new BadRequestException('Body webhook GitHub không phải JSON hợp lệ.');
+    }
     const action = payload?.action as string | undefined;
 
-    this.queue.enqueue(dedupKey, () => {
-      const card = this.webhooks.handleGithubEvent(event ?? '', action, payload);
-      this.logger.log(`Projected card (GitHub): ${JSON.stringify(card)}`);
-    });
+    this.queue.enqueue(
+      dedupKey,
+      () => {
+        const card = this.webhooks.handleGithubEvent(event ?? '', action, payload);
+        this.logger.log(`Projected card (GitHub): ${JSON.stringify(card)}`);
+      },
+      () => this.dedup.remove(dedupKey),
+    );
 
     return {
       received: true,
@@ -123,13 +132,22 @@ export class WebhooksController {
       return { received: true, duplicate: true, projectedCard: null };
     }
 
-    const payload = JSON.parse(rawBody.toString('utf8')) as any;
+    let payload: any;
+    try {
+      payload = JSON.parse(rawBody.toString('utf8')) as any;
+    } catch {
+      throw new BadRequestException('Body webhook Jira không phải JSON hợp lệ.');
+    }
     const webhookEvent = payload?.webhookEvent as string | undefined;
 
-    this.queue.enqueue(dedupKey, () => {
-      const card = this.webhooks.handleJiraEvent(webhookEvent, payload);
-      this.logger.log(`Projected card (Jira): ${JSON.stringify(card)}`);
-    });
+    this.queue.enqueue(
+      dedupKey,
+      () => {
+        const card = this.webhooks.handleJiraEvent(webhookEvent, payload);
+        this.logger.log(`Projected card (Jira): ${JSON.stringify(card)}`);
+      },
+      () => this.dedup.remove(dedupKey),
+    );
 
     return {
       received: true,

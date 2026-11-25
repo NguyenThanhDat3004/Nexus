@@ -53,6 +53,15 @@ export class DeliveryDedup implements OnModuleDestroy {
     return false;
   }
 
+  /**
+   * Gỡ key khỏi Map — dùng khi job xử lý thất bại vĩnh viễn, để lần gửi lại
+   * sau đó được xử lý lại thay vì bị bỏ qua như "trùng" dù chưa xử lý thành
+   * công lần nào. Chỉ gọi khi job đã hết 5 lần retry (xem WebhookQueue).
+   */
+  remove(key: string): void {
+    this.store.delete(key);
+  }
+
   private cleanupExpired(): void {
     const now = Date.now();
     for (const [key, recordedAt] of this.store.entries()) {

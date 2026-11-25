@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -267,7 +268,15 @@ export class JiraService {
   async registerDynamicWebhook(events: string[]): Promise<{ id: number }> {
     const { accessToken, cloudId } = await this.requireTokens();
     const appBaseUrl = this.config.get('appBaseUrl') as string;
-    const data = await this.jiraFetch<{ webhookId?: number; id?: number }>(
+    // Jira trả về { webhookRegistrationResult: [{ createdWebhookId, errors }] } —
+    // KHÔNG phải { webhookId } hay { id }. Đọc đúng field, và kiểm tra errors
+    // của từng entry: đăng ký có thể thất bại từng phần dù HTTP 200.
+    const data = await this.jiraFetch<{
+      webhookRegistrationResult?: Array<{
+        createdWebhookId?: number;
+        errors?: string[];
+      }>;
+    }>(
       cloudId,
       accessToken,
       '/webhook',
@@ -283,7 +292,18 @@ export class JiraService {
         }),
       },
     );
-    return { id: data.webhookId ?? data.id ?? -1 };
+    const result = data.webhookRegistrationResult?.[0];
+    if (result?.errors?.length) {
+      throw new BadRequestException(
+        `Jira từ chối đăng ký webhook: ${result.errors.join('; ')}`,
+      );
+    }
+    if (!result?.createdWebhookId) {
+      throw new BadRequestException(
+        'Jira không trả về webhook id (webhookRegistrationResult rỗng hoặc thiếu createdWebhookId). Đăng ký chưa chắc đã thành công — kiểm tra lại trên Jira.',
+      );
+    }
+    return { id: result.createdWebhookId };
   }
 
   /**
