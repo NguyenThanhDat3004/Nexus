@@ -15,7 +15,9 @@ export class DeviceLimitService {
 
   /**
    * Kiểm tra giới hạn thiết bị khi login:
-   * - Đếm session của user có deviceClass đó (dùng countDevicesByClass)
+   * - Đọc 1 lần danh sách session cùng loại (getSessionsByClass, đã lazy-cleanup
+   *   session hết hạn) thay vì đếm rồi đọc riêng 2 lần — trước đây 2 lần đọc
+   *   Redis riêng biệt có thể cho kết quả mâu thuẫn (409 kèm danh sách rỗng).
    * - Nếu chưa có session nào cùng loại -> allowed: true
    * - Nếu có session cùng loại và fingerprint TRÙNG -> allowed: true, existingSessionId = session đó
    * - Nếu có session cùng loại nhưng fingerprint KHÁC -> allowed: false, devices = danh sách device cùng loại đó
@@ -25,18 +27,14 @@ export class DeviceLimitService {
     deviceClass: 'mobile' | 'desktop' | 'tablet',
     deviceFingerprint: string,
   ): Promise<CheckDeviceLimitResult> {
-    const count = await this.sessionService.countDevicesByClass(
-      userId,
-      deviceClass,
-    );
-    if (count === 0) {
-      return { allowed: true };
-    }
-
     const sessions = await this.sessionService.getSessionsByClass(
       userId,
       deviceClass,
     );
+
+    if (sessions.length === 0) {
+      return { allowed: true };
+    }
 
     const matchingSession = sessions.find(
       (s) => s.deviceFingerprint === deviceFingerprint,

@@ -21,10 +21,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       lazyConnect: true,
       maxRetriesPerRequest: 1,
       retryStrategy: (times) => {
-        if (times > 3) {
-          return null; // dừng retry
-        }
-        return Math.min(times * 200, 2000);
+        // KHÔNG bao giờ trả null: trước đây sau 3 lần thất bại ioredis dừng
+        // reconnect vĩnh viễn, service chết âm thầm tới khi restart tay.
+        // Giờ retry mãi với backoff, tối đa 5s/lần — Redis chỉ down tạm thời
+        // thì service tự hồi phục.
+        return Math.min(times * 200, 5000);
       },
     });
 

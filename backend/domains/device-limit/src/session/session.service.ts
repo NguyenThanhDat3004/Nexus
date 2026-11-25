@@ -29,8 +29,68 @@ export interface DeviceSummary {
 }
 
 /**
+ * Lua script: kiểm tra giới hạn + tạo session trong 1 lần thực thi Redis
+ * (nguyên tử) — 2 login song song không thể cùng lọt qua.
+ *
+ * KEYS[1] = user:{userId}:devices (SET)
+ * ARGV[1] = userId
+ * ARGV[2] = sessionId mới (UUID)
+ * ARGV[3] = deviceClass
+ * ARGV[4] = deviceFingerprint
+ * ARGV[5] = deviceLabel
+ * ARGV[6] = ip
+ * ARGV[7] = now (ISO)
+ * ARGV[8] = TTL (giây)
+ *
+ * Trả về {'CREATED', sessionId} | {'EXISTING', sessionId} | {'LIMIT', ''}.
+ * EXISTING: session cũ được gia hạn TTL + cập nhật last_seen_at (login lại
+ * cùng máy cũng là hoạt động — phải refresh như getSession vẫn làm).
+ * Session hết hạn (key đã mất) được dọn khỏi SET ngay trong script.
+ */
+const CREATE_SESSION_IF_ALLOWED_LUA = `
+local members = redis.call('SMEMBERS', KEYS[1])
+local count = 0
+for _, sid in ipairs(members) do
+  local key = 'session:' .. sid
+  local cls = redis.call('HGET', key, 'device_class')
+  if cls == false then
+    redis.call('SREM', KEYS[1], sid)
+  elseif cls == ARGV[3] then
+    count = count + 1
+    local fp = redis.call('HGET', key, 'device_fingerprint')
+    if fp == ARGV[4] then
+      -- Login lại cùng máy: dùng lại session cũ NHƯNG gia hạn TTL +
+      -- cập nhật last_seen_at (giữ đúng hành vi cũ của đường check ->
+      -- getSession, vốn refresh mỗi lần login lại).
+      redis.call('HSET', key, 'last_seen_at', ARGV[7])
+      redis.call('EXPIRE', key, ARGV[8])
+      return {'EXISTING', sid}
+    end
+  end
+end
+if count > 0 then
+  return {'LIMIT', ''}
+end
+local sessionKey = 'session:' .. ARGV[2]
+redis.call('HSET', sessionKey,
+  'user_id', ARGV[1],
+  'ip', ARGV[6],
+  'device_class', ARGV[3],
+  'device_fingerprint', ARGV[4],
+  'device_label', ARGV[5],
+  'created_at', ARGV[7],
+  'last_seen_at', ARGV[7])
+redis.call('EXPIRE', sessionKey, ARGV[8])
+redis.call('SADD', KEYS[1], ARGV[2])
+return {'CREATED', ARGV[2]}
+`;
+
+/**
  * Sinh fingerprint thiết bị từ SHA-256 của:
  * (userAgent + maxTouchPoints + screenWidth x screenHeight)
+ *
+ * Các thành phần nối bằng '|' để 2 bộ input khác nhau không thể cho cùng 1
+ * chuỗi raw (vd UA "ab" + touch 12 vs UA "ab1" + touch 2).
  */
 export function createDeviceFingerprint(
   userAgent?: string | null,
@@ -38,7 +98,7 @@ export function createDeviceFingerprint(
   screenWidth?: number | null,
   screenHeight?: number | null,
 ): string {
-  const raw = `${userAgent ?? ''}${maxTouchPoints ?? 0}${screenWidth ?? 0}x${screenHeight ?? 0}`;
+  const raw = `${userAgent ?? ''}|${maxTouchPoints ?? 0}|${screenWidth ?? 0}x${screenHeight ?? 0}`;
   return createHash('sha256').update(raw).digest('hex');
 }
 
@@ -99,6 +159,41 @@ export class SessionService {
     await pipeline.exec();
 
     return sessionId;
+  }
+
+  /**
+   * Tạo session mới có kiểm tra giới hạn NGAY TRONG Redis (Lua script, nguyên tử):
+   * đếm session cùng loại + so fingerprint + tạo session trong 1 lần thực thi,
+   * nên 2 login song song không thể cùng lọt qua khe check-then-create.
+   * Trả về { status: 'CREATED' | 'EXISTING' | 'LIMIT', sessionId? }.
+   */
+  async createSessionIfAllowed(dto: CreateSessionDto): Promise<{
+    status: 'CREATED' | 'EXISTING' | 'LIMIT';
+    sessionId?: string;
+  }> {
+    const sessionId = randomUUID();
+    const now = new Date().toISOString();
+    const redis = this.redisService.getClient();
+
+    const result = (await redis.eval(
+      CREATE_SESSION_IF_ALLOWED_LUA,
+      1,
+      `user:${dto.userId}:devices`,
+      dto.userId,
+      sessionId,
+      dto.deviceClass,
+      dto.deviceFingerprint,
+      dto.deviceLabel,
+      dto.ip,
+      now,
+      this.sessionTtlSeconds,
+    )) as [string, string];
+
+    const [status, id] = result;
+    if (status === 'CREATED' || status === 'EXISTING') {
+      return { status, sessionId: id };
+    }
+    return { status: 'LIMIT' };
   }
 
   /**

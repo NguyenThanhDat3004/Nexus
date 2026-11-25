@@ -13,12 +13,16 @@ const logger = new Logger('DeviceClassifier');
  *
  * Quy tắc:
  * 1. UA chứa "iPad" -> tablet.
- * 2. UA chứa "iPhone" hoặc "Mobile/" -> mobile.
- * 3. UA chứa "Macintosh":
+ * 2. UA chứa "iPhone" hoặc "Mobile" -> mobile. (Chú ý: điện thoại Android có
+ *    "Mobile Safari" — "Mobile" + khoảng trắng, KHÔNG phải "Mobile/" như
+ *    iPhone — nên phải kiểm tra "Mobile" không kèm dấu '/'.)
+ * 3. UA chứa "Android" -> tablet (tablet Android; điện thoại Android đã rơi
+ *    vào quy tắc 2 vì có "Mobile").
+ * 4. UA chứa "Macintosh":
  *    - maxTouchPoints > 0 và screenWidth >= 768 -> tablet (iPad bật desktop mode).
  *    - maxTouchPoints > 0 và screenWidth < 768 -> mobile (iPhone bật desktop mode).
  *    - maxTouchPoints <= 0 -> desktop (Mac thật).
- * 4. Các trường hợp còn lại (UA lạ, UA trống): mặc định desktop + ghi log để review.
+ * 5. Các trường hợp còn lại (UA lạ, UA trống): mặc định desktop + ghi log để review.
  */
 export function classifyDevice(
   userAgent?: string | null,
@@ -33,8 +37,17 @@ export function classifyDevice(
     return 'tablet';
   }
 
-  if (ua.includes('iPhone') || ua.includes('Mobile/')) {
+  if (ua.includes('iPhone') || ua.includes('Mobile')) {
     return 'mobile';
+  }
+
+  // Tablet Android: điện thoại Android có "Mobile" trong UA nên đã rơi vào
+  // quy tắc 2; còn lại UA chứa "Android" thì là tablet. Trước đây tablet
+  // Android rơi xuống mặc định desktop, chiếm mất slot desktop (và điện thoại
+  // Android cũng vậy, vì UA thật của nó là "Mobile Safari", không phải
+  // "Mobile/" như iPhone).
+  if (ua.includes('Android')) {
+    return 'tablet';
   }
 
   if (ua.includes('Macintosh')) {

@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
-import { HttpException, HttpStatus } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import configuration from '../config/configuration';
 import { RedisModule } from '../redis/redis.module';
@@ -195,5 +199,100 @@ describe('DeviceLimit (Login Check & Session Lifecycle with Redis)', () => {
     expect(devices.length).toBe(1);
     expect(devices[0].sessionId).toBe(createResult.sessionId);
     expect(devices[0].deviceLabel).toBe('iPhone 16 Pro Max');
+  });
+
+  it('6. POST /sessions khi slot mobile đã đầy, fingerprint khác -> 409 và không tạo session mới', async () => {
+    // Slot mobile của testUserId đang có 1 session (từ test 5)
+    const before = await devicesController.getDevices(testUserId);
+    expect(before.length).toBe(1);
+
+    const resMock = createMockResponse();
+    let thrown: any;
+    try {
+      await deviceLimitController.createSession(
+        testUserId,
+        {
+          deviceClass: 'mobile',
+          deviceFingerprint: 'fp-iphone-khac-nua',
+          deviceLabel: 'iPhone khác',
+          ip: '10.0.1.10',
+        },
+        resMock,
+      );
+    } catch (err: any) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(HttpException);
+    expect(thrown.getStatus()).toBe(HttpStatus.CONFLICT);
+    const responseBody = thrown.getResponse();
+    expect(responseBody.allowed).toBe(false);
+    expect(responseBody.devices).toBeDefined();
+    expect(responseBody.devices.length).toBe(1);
+
+    // Không có session mới nào được tạo
+    const devices = await devicesController.getDevices(testUserId);
+    expect(devices.length).toBe(1);
+  });
+
+  it('7. 10 login song song cùng class, slot trống -> đúng 1 cái 201, 9 cái 409', async () => {
+    const raceUserId = `user-race-${Date.now()}`;
+    const attempts = Array.from({ length: 10 }, (_, i) => {
+      const resMock = createMockResponse();
+      return deviceLimitController
+        .createSession(
+          raceUserId,
+          {
+            deviceClass: 'desktop',
+            deviceFingerprint: `fp-race-${i}`,
+            deviceLabel: `Máy race ${i}`,
+            ip: '10.0.2.1',
+          },
+          resMock,
+        )
+        .then((result) => ({
+          ok: true,
+          status: resMock.statusCode,
+          sessionId: result.sessionId,
+        }))
+        .catch((err: any) => ({
+          ok: false,
+          status: err?.getStatus?.() ?? 0,
+          sessionId: undefined as string | undefined,
+        }));
+    });
+    const results: any[] = await Promise.all(attempts);
+    const created = results.filter((r) => r.ok);
+    const conflicts = results.filter(
+      (r) => !r.ok && r.status === HttpStatus.CONFLICT,
+    );
+    expect(created).toHaveLength(1);
+    expect(created[0].status).toBe(HttpStatus.CREATED);
+    expect(conflicts).toHaveLength(9);
+
+    // Dọn dẹp session race
+    const redis = redisService.getClient();
+    for (const r of created) {
+      await redis.del(`session:${r.sessionId}`);
+    }
+    await redis.del(`user:${raceUserId}:devices`);
+  });
+
+  it('8. deviceClass lạ -> 400 BadRequestException (không né được giới hạn bằng class bịa)', async () => {
+    await expect(
+      deviceLimitController.checkDeviceLimit(testUserId, {
+        deviceClass: 'smartwatch' as any,
+        deviceFingerprint: 'fp-watch',
+      }),
+    ).rejects.toThrow(BadRequestException);
+    await expect(
+      deviceLimitController.createSession(
+        testUserId,
+        {
+          deviceClass: 'smartwatch' as any,
+          deviceFingerprint: 'fp-watch',
+        },
+        createMockResponse(),
+      ),
+    ).rejects.toThrow(BadRequestException);
   });
 });

@@ -81,6 +81,35 @@ describe('SessionService (Redis Session Store)', () => {
       expect(session?.lastSeenAt).toBeDefined();
     });
 
+    it('login lại cùng fingerprint -> EXISTING, TTL và last_seen_at được gia hạn', async () => {
+      const fp = createDeviceFingerprint('Mozilla/5.0 (iPhone)', 5, 390, 844);
+      const sessionId = createdSessionIds[0];
+
+      // Giả lập session sắp hết hạn + last_seen_at cũ
+      const redis = redisService.getClient();
+      await redis.expire(`session:${sessionId}`, 30);
+      await redis.hset(
+        `session:${sessionId}`,
+        'last_seen_at',
+        '2000-01-01T00:00:00.000Z',
+      );
+
+      const result = await sessionService.createSessionIfAllowed({
+        userId: testUserId,
+        ip: '192.168.1.100',
+        deviceClass: 'mobile',
+        deviceFingerprint: fp,
+        deviceLabel: 'iPhone',
+      });
+      expect(result.status).toBe('EXISTING');
+      expect(result.sessionId).toBe(sessionId);
+
+      const ttl = await redis.ttl(`session:${sessionId}`);
+      expect(ttl).toBeGreaterThan(590);
+      const lastSeen = await redis.hget(`session:${sessionId}`, 'last_seen_at');
+      expect(lastSeen).not.toBe('2000-01-01T00:00:00.000Z');
+    });
+
     it('đọc lại session -> last_seen_at được cập nhật', async () => {
       const sessionId = createdSessionIds[0];
       const sessionFirst = await sessionService.getSession(sessionId);
@@ -143,6 +172,16 @@ describe('SessionService (Redis Session Store)', () => {
       expect(devices.some((d) => d.sessionId === sessionIdToDelete)).toBe(
         false,
       );
+    });
+  });
+
+  describe('createDeviceFingerprint', () => {
+    it('2 bộ input khác nhau nhưng nối chuỗi không dấu phân cách sẽ trùng -> fingerprint phải khác nhau', () => {
+      // UA "ab" + touch 12 vs UA "ab1" + touch 2: không có dấu phân cách thì
+      // cả 2 đều ra chuỗi raw "ab120x0" -> cùng 1 fingerprint (nhận nhầm máy).
+      const fp1 = createDeviceFingerprint('ab', 12, 0, 0);
+      const fp2 = createDeviceFingerprint('ab1', 2, 0, 0);
+      expect(fp1).not.toBe(fp2);
     });
   });
 });

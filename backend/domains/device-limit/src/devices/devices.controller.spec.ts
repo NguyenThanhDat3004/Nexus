@@ -135,6 +135,17 @@ describe('DevicesController (Devices API with PIN)', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
+  it('DELETE với PIN sai + session không tồn tại -> ném 404 (không lộ PIN đúng/sai qua mã lỗi)', async () => {
+    // Trước đây: PIN sai -> 401, PIN đúng + session không tồn tại -> 404,
+    // nên kẻ tấn công dùng sessionId giả để dò PIN (PIN oracle). Giờ sessionId
+    // giả luôn trả 404 bất kể PIN đúng hay sai.
+    await expect(
+      controller.deleteDevice(testUserId, 'non-existent-session-id', {
+        pin: wrongPin,
+      }),
+    ).rejects.toThrow(NotFoundException);
+  });
+
   it('DELETE session của user khác -> ném 404 NotFoundException', async () => {
     // Tạo session thuộc về otherUserId
     const otherSessionId = await sessionService.createSession({

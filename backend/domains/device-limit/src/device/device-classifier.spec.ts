@@ -31,6 +31,18 @@ describe('classifyDevice', () => {
     expect(classifyDevice(ua, 5, 1024)).toBe('tablet');
   });
 
+  it('Tablet Android: UA Android không có Mobile/, touch 5, màn 800 -> tablet', () => {
+    const ua =
+      'Mozilla/5.0 (Linux; Android 14; SM-X710) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    expect(classifyDevice(ua, 5, 800)).toBe('tablet');
+  });
+
+  it('Điện thoại Android: UA Android + Mobile/, touch 5, màn 412 -> mobile', () => {
+    const ua =
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+    expect(classifyDevice(ua, 5, 412)).toBe('mobile');
+  });
+
   it('UA trống: "", touch 0, màn 0 -> desktop (không throw)', () => {
     expect(() => classifyDevice('', 0, 0)).not.toThrow();
     expect(classifyDevice('', 0, 0)).toBe('desktop');

@@ -26,6 +26,23 @@ export interface CreateSessionRequestDto {
   existingSessionId?: string;
 }
 
+/** Các giá trị deviceClass hợp lệ — chặn client bịa class lạ để né giới hạn. */
+const VALID_DEVICE_CLASSES = ['mobile', 'desktop', 'tablet'] as const;
+
+function assertValidDeviceClass(deviceClass: unknown): asserts deviceClass is
+  | 'mobile'
+  | 'desktop'
+  | 'tablet' {
+  if (
+    typeof deviceClass !== 'string' ||
+    !(VALID_DEVICE_CLASSES as readonly string[]).includes(deviceClass)
+  ) {
+    throw new BadRequestException(
+      `deviceClass không hợp lệ: ${String(deviceClass)} (chỉ mobile/desktop/tablet)`,
+    );
+  }
+}
+
 @Controller('users/:userId')
 export class DeviceLimitController {
   constructor(
@@ -42,6 +59,7 @@ export class DeviceLimitController {
     if (!body || !body.deviceClass || !body.deviceFingerprint) {
       throw new BadRequestException('Thiếu deviceClass hoặc deviceFingerprint');
     }
+    assertValidDeviceClass(body.deviceClass);
 
     const result = await this.deviceLimitService.checkDeviceLimit(
       userId,
@@ -77,28 +95,25 @@ export class DeviceLimitController {
     if (!body || !body.deviceClass || !body.deviceFingerprint) {
       throw new BadRequestException('Thiếu deviceClass hoặc deviceFingerprint');
     }
+    assertValidDeviceClass(body.deviceClass);
 
-    let targetSessionId = body.existingSessionId;
-    if (!targetSessionId) {
-      const limitCheck = await this.deviceLimitService.checkDeviceLimit(
-        userId,
-        body.deviceClass,
-        body.deviceFingerprint,
+    // Client đã biết sessionId cũ (login lại cùng máy): chỉ dùng lại session
+    // đó, không tạo mới nên không cần kiểm tra giới hạn.
+    if (body.existingSessionId) {
+      const existing = await this.sessionService.getSession(
+        body.existingSessionId,
       );
-      if (limitCheck.existingSessionId) {
-        targetSessionId = limitCheck.existingSessionId;
-      }
-    }
-
-    if (targetSessionId) {
-      const existing = await this.sessionService.getSession(targetSessionId);
       if (existing && existing.userId === userId) {
         res.status(HttpStatus.OK);
-        return { sessionId: targetSessionId };
+        return { sessionId: body.existingSessionId };
       }
+      // existingSessionId không hợp lệ -> rơi xuống tạo mới qua đường nguyên tử.
     }
 
-    const sessionId = await this.sessionService.createSession({
+    // Tạo session nguyên tử trong Redis (Lua script): kiểm tra giới hạn +
+    // tạo trong 1 lần thực thi, 2 login song song không thể cùng lọt qua khe
+    // check-then-create. Hết slot -> 409 kèm danh sách device cùng loại.
+    const result = await this.sessionService.createSessionIfAllowed({
       userId,
       ip: body.ip ?? '127.0.0.1',
       deviceClass: body.deviceClass,
@@ -106,7 +121,28 @@ export class DeviceLimitController {
       deviceLabel: body.deviceLabel ?? 'Thiết bị lạ',
     });
 
-    res.status(HttpStatus.CREATED);
-    return { sessionId };
+    if (result.status === 'LIMIT') {
+      const devices = await this.sessionService.getSessionsByClass(
+        userId,
+        body.deviceClass,
+      );
+      throw new HttpException(
+        {
+          allowed: false,
+          devices: devices.map((s) => ({
+            sessionId: s.sessionId,
+            deviceClass: s.deviceClass,
+            deviceLabel: s.deviceLabel,
+            lastSeenAt: s.lastSeenAt,
+          })),
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    res.status(
+      result.status === 'CREATED' ? HttpStatus.CREATED : HttpStatus.OK,
+    );
+    return { sessionId: result.sessionId };
   }
 }
