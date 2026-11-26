@@ -14,7 +14,9 @@ public class SsoDto {
             String avatarUrl,
             String providerId,
             String role,
-            boolean agreedPolicy
+            boolean agreedPolicy,
+            String pin,
+            String confirmPin
     ) {}
 
     public record LoginResponse(

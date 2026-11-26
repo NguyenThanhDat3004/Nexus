@@ -67,6 +67,17 @@
 			<version>3.0.0</version>
 		</dependency>
 
+		<!-- Security Crypto & BouncyCastle (Argon2 PIN Hashing) -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-crypto</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcprov-jdk18on</artifactId>
+			<version>1.79</version>
+		</dependency>
+
 		<!-- Redis Starter (Quản lý TTL, One-Time Ticket Session) -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
@@ -30,6 +31,7 @@ import java.time.OffsetDateTime;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 public class SsoService {
@@ -37,8 +39,9 @@ public class SsoService {
     private static final Logger log = LoggerFactory.getLogger(SsoService.class);
     private static final String GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
     private static final String REDIS_TICKET_PREFIX = "nexus:sso:ticket:";
-    
+
     private static final Duration TICKET_TTL = Duration.ofMinutes(10);
+    private static final Pattern PIN_PATTERN = Pattern.compile("^\\d{8}$");
 
     public static final String STATUS_PENDING = "PENDING";
     public static final String STATUS_USED = "USED";
@@ -58,6 +61,7 @@ public class SsoService {
 
     private final RestClient restClient = RestClient.builder().build();
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Argon2PasswordEncoder argon2Encoder = Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();
 
     @Autowired(required = false)
     private StringRedisTemplate redisTemplate;
@@ -249,6 +253,15 @@ public class SsoService {
         if (!request.agreedPolicy()) {
             throw new ResponseStatusException(HttpStatusCode.valueOf(400), "You must agree to the Terms and Policies");
         }
+        if (request.pin() == null || !PIN_PATTERN.matcher(request.pin()).matches()) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400), "PIN must be exactly 8 numeric digits");
+        }
+        if (request.confirmPin() == null || !PIN_PATTERN.matcher(request.confirmPin()).matches()) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400), "Confirm PIN must be exactly 8 numeric digits");
+        }
+        if (!request.pin().equals(request.confirmPin())) {
+            throw new ResponseStatusException(HttpStatusCode.valueOf(400), "PIN confirmation does not match");
+        }
 
         String email = request.email().toLowerCase().trim();
         String lockKey = "db:save:register:" + email;
@@ -273,7 +286,7 @@ public class SsoService {
 
             log.info("Locked Redis for DB persistence. Registering new SSO user: {}", email);
 
-            // 3. Tạo account
+            // 3. Tạo account & hash mã PIN bằng Argon2 (chỉ lưu pinHash, không lưu confirmPin)
             Account account = new Account(
                     email,
                     "GOOGLE",
@@ -281,6 +294,7 @@ public class SsoService {
                     request.role() != null && !request.role().isBlank() ? request.role() : "USER",
                     true // Google email is verified
             );
+            account.setPinHash(argon2Encoder.encode(request.pin()));
             account.setLastLoginAt(OffsetDateTime.now());
             Account savedAccount = accountRepository.save(account);
 

@@ -15,8 +15,8 @@ public class Account {
     @Column(nullable = false, unique = true, length = 255)
     private String email;
 
-    @Column(name = "password_hash", length = 255)
-    private String passwordHash;
+    @Column(name = "pin_hash", length = 255)
+    private String pinHash;
 
     @Column(name = "auth_provider", nullable = false, length = 50)
     private String authProvider = "LOCAL";
@@ -81,8 +81,8 @@ public class Account {
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
 
-    public String getPasswordHash() { return passwordHash; }
-    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+    public String getPinHash() { return pinHash; }
+    public void setPinHash(String pinHash) { this.pinHash = pinHash; }
 
     public String getAuthProvider() { return authProvider; }
     public void setAuthProvider(String authProvider) { this.authProvider = authProvider; }
