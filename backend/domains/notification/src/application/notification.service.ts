@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { NotificationEvent, NotificationItem, NotificationPage } from '../domain/notification';
-import { decodeCursor, encodeCursor } from './cursor';
 import { NotificationRepository } from './ports/notification.repository';
 import { RealtimePublisher } from './ports/realtime.publisher';
 
@@ -30,15 +29,13 @@ export class NotificationService {
     return { created: true, notification_id: saved.notification_id };
   }
 
-  async list(userId: string, limit: number, rawCursor?: string): Promise<NotificationPage> {
-    const cursor = decodeCursor(rawCursor);
-    const rows = await this.repo.listForUser(userId, limit + 1, cursor); // lấy dư 1 để biết còn trang sau
-    const items = rows.slice(0, limit);
-    const last = items.at(-1);
-    return {
-      items,
-      next_cursor: rows.length > limit && last ? encodeCursor({ created_at: last.created_at, notification_id: last.notification_id }) : null,
-    };
+    async list(userId: string, page: number, limit: number): Promise<NotificationPage> {
+    // 2 query độc lập → chạy song song cho nhanh
+    const [items, total] = await Promise.all([
+      this.repo.listForUser(userId, (page - 1) * limit, limit),
+      this.repo.countForUser(userId),
+    ]);
+    return { items, page, limit, total, has_more: page * limit < total };
   }
 
   async markRead(userId: string, notificationId: string): Promise<void> {

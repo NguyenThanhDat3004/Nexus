@@ -27,5 +27,10 @@ export interface NotificationItem {
   read_at: string | null;
 }
 
-export interface NotificationPage { items: NotificationItem[]; next_cursor: string | null }
-export interface NotificationCursor { created_at: string; notification_id: string }
+export interface NotificationPage{
+  items: NotificationItem[];
+  page: number;
+  limit: number;
+  total: number;
+  has_more: boolean;
+}

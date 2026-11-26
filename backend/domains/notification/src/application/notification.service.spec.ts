@@ -1,6 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import type { NotificationEvent, NotificationItem } from '../domain/notification';
-import { decodeCursor } from './cursor';
+
 import { NotificationService } from './notification.service';
 import { NotificationRepository } from './ports/notification.repository';
 import { RealtimePublisher } from './ports/realtime.publisher';
@@ -19,7 +19,7 @@ describe('NotificationService', () => {
   let service: NotificationService;
 
   beforeEach(() => {
-    repo = { saveFromEvent: jest.fn(), listForUser: jest.fn(), markRead: jest.fn(), markAllRead: jest.fn(), countUnread: jest.fn() } as never;
+        repo = { saveFromEvent: jest.fn(), listForUser: jest.fn(), countForUser: jest.fn(), markRead: jest.fn(), markAllRead: jest.fn(), countUnread: jest.fn() } as never;
     realtime = { publish: jest.fn() } as never;
     service = new NotificationService(repo, realtime);
   });
@@ -37,22 +37,32 @@ describe('NotificationService', () => {
     expect(realtime.publish).not.toHaveBeenCalled();
   });
 
-  it('phân trang: có trang sau thì trả next_cursor trỏ vào phần tử cuối', async () => {
-    const id = (n: number) => `00000000-0000-4000-8000-00000000000${n}`;
-    repo.listForUser.mockResolvedValue([item(id(3), '2026-11-22T03:00:00.000Z'), item(id(2), '2026-11-22T02:00:00.000Z'), item(id(1), '2026-11-22T01:00:00.000Z')]);
-    const page = await service.list('u1', 2);
-    expect(repo.listForUser).toHaveBeenCalledWith('u1', 3, null);
-    expect(page.items).toHaveLength(2);
-    expect(decodeCursor(page.next_cursor!)).toEqual({ created_at: '2026-11-22T02:00:00.000Z', notification_id: id(2) });
-  });
-
-  it('trang cuối → next_cursor = null', async () => {
+   it('page 1 → skip 0, take limit', async () => {
     repo.listForUser.mockResolvedValue([]);
-    expect((await service.list('u1', 20)).next_cursor).toBeNull();
+    repo.countForUser.mockResolvedValue(0);
+    await service.list('u1', 1, 20);
+    expect(repo.listForUser).toHaveBeenCalledWith('u1', 0, 20);
   });
 
-  it('cursor rác → 400', async () => {
-    await expect(service.list('u1', 20, 'not-a-cursor')).rejects.toThrow('INVALID_CURSOR');
+  it('page 2 → bỏ qua limit phần tử đầu, còn trang sau thì has_more = true', async () => {
+    repo.listForUser.mockResolvedValue([item('n3', '2026-11-22T03:00:00.000Z'), item('n4', '2026-11-22T02:00:00.000Z')]);
+    repo.countForUser.mockResolvedValue(5);
+    const page = await service.list('u1', 2, 2);
+    expect(repo.listForUser).toHaveBeenCalledWith('u1', 2, 2);
+    expect(page).toMatchObject({ page: 2, limit: 2, total: 5, has_more: true });
+    expect(page.items).toHaveLength(2);
+  });
+
+  it('trang cuối vừa khít → has_more = false', async () => {
+    repo.listForUser.mockResolvedValue([item('n3', '2026-11-22T03:00:00.000Z'), item('n4', '2026-11-22T02:00:00.000Z')]);
+    repo.countForUser.mockResolvedValue(4);
+    expect((await service.list('u1', 2, 2)).has_more).toBe(false);
+  });
+
+  it('page vượt quá số trang → items rỗng, has_more = false', async () => {
+    repo.listForUser.mockResolvedValue([]);
+    repo.countForUser.mockResolvedValue(3);
+    expect(await service.list('u1', 5, 20)).toMatchObject({ items: [], total: 3, has_more: false });
   });
 
   it('đánh dấu thông báo không thuộc mình → 404', async () => {

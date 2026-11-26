@@ -16,7 +16,7 @@ export class NotificationsController {
 
   @Get()
   list(@CurrentUser() user: AuthUser, @Query() query: ListNotificationsQuery) {
-    return this.notifications.list(user.userId, query.limit, query.cursor);
+    return this.notifications.list(user.userId, query.page,query.limit);
   }
 
   @Get('unread-count')

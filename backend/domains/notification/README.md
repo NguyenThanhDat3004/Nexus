@@ -8,8 +8,7 @@
 1. **Thông báo trong ứng dụng (In-app Notifications):**
    - Nhận event từ các service khác (Workspace, Collaboration...) qua API nội bộ, lưu DB và đẩy realtime tới người nhận.
    - Chống trùng: cùng `event_id` gửi lại (retry) không tạo thông báo mới.
-   - Danh sách thông báo phân trang theo cursor, đếm số chưa đọc, đánh dấu đã đọc từng cái hoặc tất cả.
-   - Trạng thái đã đọc lưu riêng cho từng người nhận.
+  - Danh sách thông báo phân trang theo offset (`page`, `limit`), đếm số chưa đọc, đánh dấu đã đọc từng cái hoặc tất cả.     - Trạng thái đã đọc lưu riêng cho từng người nhận.
 2. **Realtime (Project Notifications & Channel Events):**
    - **SSE:** luồng một chiều cho feed thông báo và chuông, có heartbeat 25 giây.
    - **WebSocket (Socket.IO, namespace `/realtime`):** hai chiều. Client subscribe kênh để nhận sự kiện của kênh. Server kiểm tra quyền thành viên trước khi cho vào (chống IDOR).
@@ -113,7 +112,7 @@ Khi lỗi thì `success: false`, `data: null`. Lỗi validate có thêm `errors:
 | Method | Path | Mô tả | Response `data` |
 |---|---|---|---|
 | GET | `/api/v1/notifications?limit=20&cursor=` | Thông báo của user trong token, mới nhất trước. `limit` từ 1 đến 50 | `{ items: NotificationItem[], next_cursor }` |
-| GET | `/api/v1/notifications/unread-count` | Số thông báo chưa đọc | `{ unread }` |
+| GET | `/api/v1/notifications?page=1&limit=20` | Thông báo của user trong token, mới nhất trước. `page` từ 1 đến 100, `limit` từ 1 đến 50 | `{ items: NotificationItem[], page, limit, total, has_more }` |
 | PATCH | `/api/v1/notifications/{id}/read` | Đánh dấu đã đọc. `id` phải là UUID | `{ notification_id, read: true }` |
 | POST | `/api/v1/notifications/read-all` | Đánh dấu tất cả đã đọc | `{ updated }` |
 | GET | `/api/v1/notifications/stream` | **SSE**: event `notification` (data là `NotificationItem`), event `ping` mỗi 25 giây | stream |
@@ -121,7 +120,7 @@ Khi lỗi thì `success: false`, `data: null`. Lỗi validate có thêm `errors:
 Mã lỗi:
 - `401 MISSING_ACCESS_TOKEN` / `INVALID_ACCESS_TOKEN`
 - `404 NOTIFICATION_NOT_FOUND`: thông báo không tồn tại **hoặc** thuộc người khác (chống IDOR)
-- `400`: id không phải UUID, `limit` sai, hoặc `INVALID_CURSOR`
+- `400`: id không phải UUID, `page` / `limit` ngoài khoảng cho phép, hoặc gửi tham số lạ (ví dụ `cursor`)
 
 ```json
 // NotificationItem

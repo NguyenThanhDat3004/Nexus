@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Notification, Prisma } from '@prisma/client';
 import { NotificationRepository } from '../../application/ports/notification.repository';
-import type { NotificationCursor, NotificationEvent, NotificationItem } from '../../domain/notification';
+import type { NotificationEvent, NotificationItem } from '../../domain/notification';
 import { PrismaService } from './prisma.service';
 
 const toItem = (n: Notification, readAt: Date | null): NotificationItem => ({
@@ -45,22 +45,21 @@ export class PrismaNotificationRepository extends NotificationRepository {
     }
   }
 
-  async listForUser(userId: string, take: number, cursor: NotificationCursor | null) {
-    const after = cursor && {
-      notification: {
-        OR: [
-          { created_at: { lt: new Date(cursor.created_at) } },
-          { created_at: new Date(cursor.created_at), notification_id: { lt: cursor.notification_id } },
-        ],
-      },
-    };
+  async listForUser(userId: string, skip: number, take: number) {
     const rows = await this.prisma.notificationRecipient.findMany({
-      where: { user_id: userId, ...after },
+      where: { user_id: userId },
       include: { notification: true },
+      // notification_id là tiêu chí phụ: 2 thông báo cùng created_at luôn có thứ tự cố định,
+      // nếu không chúng có thể đổi chỗ giữa 2 lần query → 1 dòng hiện ở cả trang 1 và trang 2
       orderBy: [{ notification: { created_at: 'desc' } }, { notification_id: 'desc' }],
+      skip,
       take,
     });
     return rows.map((r) => toItem(r.notification, r.read_at));
+  }
+
+  countForUser(userId: string) {
+    return this.prisma.notificationRecipient.count({ where: { user_id: userId } });
   }
 
   async markRead(userId: string, notificationId: string, at: Date) {

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { NotificationRepository } from '../application/ports/notification.repository';
-import type { NotificationCursor, NotificationEvent, NotificationItem } from '../domain/notification';
+import type {  NotificationEvent, NotificationItem } from '../domain/notification';
 
 export class InMemoryNotificationRepository extends NotificationRepository {
   private readonly items = new Map<string, { event_id: string; item: NotificationItem }>();
@@ -18,13 +18,16 @@ export class InMemoryNotificationRepository extends NotificationRepository {
     return { notification_id, created_at };
   }
 
-  async listForUser(userId: string, take: number, cursor: NotificationCursor | null) {
+   async listForUser(userId: string, skip: number, take: number) {
     return [...this.reads.entries()]
       .filter(([key]) => key.split('|')[1] === userId)
       .map(([key, readAt]) => ({ ...this.items.get(key.split('|')[0])!.item, read_at: readAt?.toISOString() ?? null }))
       .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.notification_id.localeCompare(a.notification_id))
-      .filter((i) => !cursor || i.created_at < cursor.created_at || (i.created_at === cursor.created_at && i.notification_id < cursor.notification_id))
-      .slice(0, take);
+      .slice(skip, skip + take);
+  }
+
+  async countForUser(userId: string) {
+    return [...this.reads.keys()].filter((key) => key.split('|')[1] === userId).length;
   }
 
   async markRead(userId: string, id: string, at: Date) {

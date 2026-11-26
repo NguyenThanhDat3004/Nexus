@@ -64,4 +64,28 @@ describe('Notifications REST (e2e)', () => {
     expect((await request(app.getHttpServer()).patch('/api/v1/notifications/1/read').set(auth)).status).toBe(400);
     expect((await request(app.getHttpServer()).get('/api/v1/notifications?limit=500').set(auth)).status).toBe(400);
   });
+
+    it('phân trang offset: page/limit/total/has_more; page sai hoặc còn gửi cursor → 400', async () => {
+    const auth = { Authorization: `Bearer ${tokenOf('alice')}` };
+    // alice đã có 1 thông báo (evt-1) từ test đầu → thêm 2 nữa = 3
+    await sendEvent({ ...baseEvent, event_id: 'evt-page-2' });
+    await sendEvent({ ...baseEvent, event_id: 'evt-page-3' });
+
+    const p1 = await request(app.getHttpServer()).get('/api/v1/notifications?page=1&limit=2').set(auth);
+    expect(p1.status).toBe(200);
+    expect(p1.body.data).toMatchObject({ page: 1, limit: 2, total: 3, has_more: true });
+    expect(p1.body.data.items).toHaveLength(2);
+
+    const p2 = await request(app.getHttpServer()).get('/api/v1/notifications?page=2&limit=2').set(auth);
+    expect(p2.body.data).toMatchObject({ page: 2, total: 3, has_more: false });
+    expect(p2.body.data.items).toHaveLength(1);
+
+    // 2 trang không được trùng nhau
+    const ids = [...p1.body.data.items, ...p2.body.data.items].map((i: { notification_id: string }) => i.notification_id);
+    expect(new Set(ids).size).toBe(3);
+
+    expect((await request(app.getHttpServer()).get('/api/v1/notifications?page=0').set(auth)).status).toBe(400);
+    expect((await request(app.getHttpServer()).get('/api/v1/notifications?page=101').set(auth)).status).toBe(400);
+    expect((await request(app.getHttpServer()).get('/api/v1/notifications?cursor=abc').set(auth)).status).toBe(400);
+  });
 });
