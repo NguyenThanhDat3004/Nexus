@@ -11,4 +11,6 @@ export abstract class NotificationRepository {
   abstract markRead(userId: string, notificationId: string, at: Date): Promise<boolean>;
   abstract markAllRead(userId: string, at: Date): Promise<number>;
   abstract countUnread(userId: string): Promise<number>;
+  /** Xoá TỐI ĐA `limit` thông báo tạo trước `cutoff` (cũ nhất trước). Trả số đã xoá. Người nhận xoá theo nhờ cascade */
+  abstract deleteOlderThan(cutoff: Date, limit: number): Promise<number>;
 }

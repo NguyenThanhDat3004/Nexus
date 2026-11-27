@@ -21,4 +21,10 @@ describe('buildConfig', () => {
   it('số không hợp lệ → mặc định', () => {
     expect(buildConfig({ ...validEnv, OTP_TTL_SECONDS: 'abc' }).otp.ttlSeconds).toBe(60);
   });
+  it('retention mặc định 90 / 180 ngày, lô 1000', () => {
+    expect(buildConfig(validEnv).retention).toEqual({ notificationDays: 90, mailLogDays: 180, batchSize: 1000 });
+  });
+  it('retention = 0 → dùng mặc định (không bao giờ xoá sạch)', () => {
+    expect(buildConfig({ ...validEnv, NOTIFICATION_RETENTION_DAYS: '0' }).retention.notificationDays).toBe(90);
+  });
 });

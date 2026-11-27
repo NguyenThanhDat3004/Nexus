@@ -79,4 +79,17 @@ export class PrismaNotificationRepository extends NotificationRepository {
   countUnread(userId: string) {
     return this.prisma.notificationRecipient.count({ where: { user_id: userId, read_at: null } });
   }
+
+  deleteOlderThan(cutoff: Date, limit: number) {
+    // Prisma deleteMany không hỗ trợ LIMIT → dùng SQL thô để xoá từng lô nhỏ.
+    // Tagged template gửi ${x} thành tham số $1, $2 (KHÔNG ghép chuỗi) → không bị SQL injection.
+    // notification_recipients có FK ON DELETE CASCADE → Postgres tự xoá người nhận theo.
+    return this.prisma.$executeRaw`
+      DELETE FROM notifications WHERE notification_id IN (
+        SELECT notification_id FROM notifications
+        WHERE created_at < ${cutoff}
+        ORDER BY created_at
+        LIMIT ${limit}
+      )`;
+  }
 }

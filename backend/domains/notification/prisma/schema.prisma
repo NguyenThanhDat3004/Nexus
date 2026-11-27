@@ -23,6 +23,7 @@ model Notification {
   recipients      NotificationRecipient[]
 
   @@index([project_id])
+  @@index([created_at])
   @@map("notifications")
 }
 
@@ -55,6 +56,7 @@ model MailLog {
   error           String?      @db.VarChar(500)
   created_at      DateTime     @default(now()) @db.Timestamptz(3)
 
+  @@index([created_at])
   @@index([recipient_email, created_at])
   @@map("mail_logs")
 }

@@ -46,4 +46,17 @@ export class InMemoryNotificationRepository extends NotificationRepository {
   async countUnread(userId: string) {
     return [...this.reads].filter(([key, value]) => key.split('|')[1] === userId && !value).length;
   }
+
+  async deleteOlderThan(cutoff: Date, limit: number) {
+    const ids = [...this.items.entries()]
+      .filter(([, n]) => new Date(n.item.created_at) < cutoff)
+      .sort(([, a], [, b]) => a.item.created_at.localeCompare(b.item.created_at)) // cũ nhất trước, giống ORDER BY
+      .slice(0, limit) // giống LIMIT
+      .map(([id]) => id);
+    for (const id of ids) {
+      this.items.delete(id);
+      for (const key of [...this.reads.keys()]) if (key.startsWith(`${id}|`)) this.reads.delete(key); // giống cascade
+    }
+    return ids.length;
+  }
 }

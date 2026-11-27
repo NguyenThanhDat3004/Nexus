@@ -88,4 +88,15 @@ describe('Notifications REST (e2e)', () => {
     expect((await request(app.getHttpServer()).get('/api/v1/notifications?page=101').set(auth)).status).toBe(400);
     expect((await request(app.getHttpServer()).get('/api/v1/notifications?cursor=abc').set(auth)).status).toBe(400);
   });
+
+  it('deleteOlderThan: xoá thông báo cũ nhất và người nhận của nó', async () => {
+    const repo = app.get(NotificationRepository); // bản InMemory nhờ overrideProvider ở beforeAll
+    const auth = { Authorization: `Bearer ${tokenOf('alice')}` };
+    const totalOf = async () => (await request(app.getHttpServer()).get('/api/v1/notifications').set(auth)).body.data.total;
+
+    const before = await totalOf();
+    // cutoff ở tương lai 1 giây → mọi thông báo đều "cũ"; limit 1 → chỉ xoá đúng 1 cái
+    expect(await repo.deleteOlderThan(new Date(Date.now() + 1000), 1)).toBe(1);
+    expect(await totalOf()).toBe(before - 1);
+  });
 });

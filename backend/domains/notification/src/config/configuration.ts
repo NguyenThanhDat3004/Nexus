@@ -6,6 +6,7 @@ export interface AppConfig {
   redis: { host: string; port: number; password?: string };
   mail: { host: string; port: number; secure: boolean; user?: string; pass?: string; from: string };
   otp: { ttlSeconds: number; resendCooldownSeconds: number; maxAttempts: number; hmacSecret: string };
+  retention: { notificationDays: number; mailLogDays: number; batchSize: number };
 }
 
 function requireSecret(env: NodeJS.ProcessEnv, name: string, minLength: number): string {
@@ -39,6 +40,12 @@ export function buildConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       resendCooldownSeconds: toInt(env.OTP_RESEND_COOLDOWN_SECONDS, 60),
       maxAttempts: toInt(env.OTP_MAX_ATTEMPTS, 5),
       hmacSecret: requireSecret(env, 'OTP_HMAC_SECRET', 32),
+    },
+    // toInt chỉ nhận số > 0 → cấu hình 0 / sai định dạng dùng mặc định, không bao giờ xoá sạch dữ liệu
+    retention: {
+      notificationDays: toInt(env.NOTIFICATION_RETENTION_DAYS, 90),
+      mailLogDays: toInt(env.MAIL_LOG_RETENTION_DAYS, 180),
+      batchSize: toInt(env.RETENTION_BATCH_SIZE, 1000),
     },
   };
 }
