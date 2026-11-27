@@ -8,7 +8,9 @@
 1. **Thông báo trong ứng dụng (In-app Notifications):**
    - Nhận event từ các service khác (Workspace, Collaboration...) qua API nội bộ, lưu DB và đẩy realtime tới người nhận.
    - Chống trùng: cùng `event_id` gửi lại (retry) không tạo thông báo mới.
-  - Danh sách thông báo phân trang theo offset (`page`, `limit`), đếm số chưa đọc, đánh dấu đã đọc từng cái hoặc tất cả.     - Trạng thái đã đọc lưu riêng cho từng người nhận.
+   - Danh sách thông báo phân trang theo offset (`page`, `limit`), trả kèm `total` và `has_more`.
+   - Đếm số chưa đọc, đánh dấu đã đọc từng cái hoặc tất cả.
+   - Trạng thái đã đọc lưu riêng cho từng người nhận.
 2. **Realtime (Project Notifications & Channel Events):**
    - **SSE:** luồng một chiều cho feed thông báo và chuông, có heartbeat 25 giây.
    - **WebSocket (Socket.IO, namespace `/realtime`):** hai chiều. Client subscribe kênh để nhận sự kiện của kênh. Server kiểm tra quyền thành viên trước khi cho vào (chống IDOR).
@@ -111,8 +113,8 @@ Khi lỗi thì `success: false`, `data: null`. Lỗi validate có thêm `errors:
 
 | Method | Path | Mô tả | Response `data` |
 |---|---|---|---|
-| GET | `/api/v1/notifications?limit=20&cursor=` | Thông báo của user trong token, mới nhất trước. `limit` từ 1 đến 50 | `{ items: NotificationItem[], next_cursor }` |
-| GET | `/api/v1/notifications?page=1&limit=20` | Thông báo của user trong token, mới nhất trước. `page` từ 1 đến 100, `limit` từ 1 đến 50 | `{ items: NotificationItem[], page, limit, total, has_more }` |
+| GET | `/api/v1/notifications?page=1&limit=20` | Thông báo của user trong token, mới nhất trước. `page` từ 1 đến 100 (mặc định 1), `limit` từ 1 đến 50 (mặc định 20) | `{ items: NotificationItem[], page, limit, total, has_more }` |
+| GET | `/api/v1/notifications/unread-count` | Số thông báo chưa đọc | `{ unread }` |
 | PATCH | `/api/v1/notifications/{id}/read` | Đánh dấu đã đọc. `id` phải là UUID | `{ notification_id, read: true }` |
 | POST | `/api/v1/notifications/read-all` | Đánh dấu tất cả đã đọc | `{ updated }` |
 | GET | `/api/v1/notifications/stream` | **SSE**: event `notification` (data là `NotificationItem`), event `ping` mỗi 25 giây | stream |
@@ -135,6 +137,18 @@ Mã lỗi:
   "read_at": null
 }
 ```
+
+#### Phân trang
+
+```json
+// GET /api/v1/notifications?page=2&limit=20
+{ "items": [ /* NotificationItem */ ], "page": 2, "limit": 20, "total": 45, "has_more": true }
+```
+
+- Sắp xếp theo `created_at` giảm dần, cùng thời điểm thì theo `notification_id`, nên thứ tự luôn cố định giữa các lần gọi.
+- `has_more = page * limit < total`. `page` vượt quá số trang thì trả `items: []`, không báo lỗi.
+- `page` tối đa 100 để DB không phải bỏ qua quá nhiều dòng (`OFFSET` lớn sẽ chậm).
+- **Lưu ý cho FE:** có thông báo mới đến trong lúc đang cuộn thì danh sách bị đẩy xuống, nên trang sau có thể lặp lại phần tử cuối của trang trước. Khi nối trang, bỏ các phần tử có `notification_id` đã hiển thị. Thông báo mới nhận qua SSE thì chèn lên đầu danh sách, không cần tải lại trang 1.
 
 ### 2. Realtime WebSocket: Socket.IO namespace `/realtime`
 

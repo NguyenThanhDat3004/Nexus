@@ -49,7 +49,6 @@ backend/domains/notification/
     │   │   ├── realtime.publisher.ts     (4)
     │   │   ├── membership.port.ts        (6)
     │   │   └── mail.ports.ts             (7)  MailSender, MailLogRepository
-    │   ├── cursor.ts                     (4)  phân trang theo cursor
     │   ├── notification.service.ts       (4)
     │   ├── notification.service.spec.ts  (4)
     │   ├── mail.service.ts               (7)
